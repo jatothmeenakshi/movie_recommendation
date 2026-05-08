@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import pickle
+import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 st.set_page_config(
     page_title="Movie Recommendation System",
@@ -10,17 +13,36 @@ st.set_page_config(
 
 @st.cache_resource
 def load_model():
-    with open("cosine_sim.pkl", "rb") as f:
-        cosine_sim = pickle.load(f)
-    with open("movies.pkl", "rb") as f:
-        movies = pickle.load(f)
-    with open("indices.pkl", "rb") as f:
-        indices = pickle.load(f)
+    # Build model if pkl files don't exist
+    if not os.path.exists("cosine_sim.pkl"):
+        st.info("Building recommendation model... please wait 2 minutes!")
+        movies = pd.read_csv("https://raw.githubusercontent.com/karma-786/Week-4-and-5-Assignment/main/tmdb_5000_movies.csv")
+        movies = movies[["title", "overview", "genres",
+                         "keywords", "popularity", "vote_average"]]
+        movies["overview"] = movies["overview"].fillna("")
+        movies["combined"] = movies["overview"]
+        movies = movies.reset_index()
+        tfidf = TfidfVectorizer(stop_words="english")
+        tfidf_matrix = tfidf.fit_transform(movies["combined"])
+        cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+        indices = pd.Series(movies.index, index=movies["title"])
+        with open("cosine_sim.pkl", "wb") as f:
+            pickle.dump(cosine_sim, f)
+        with open("movies.pkl", "wb") as f:
+            pickle.dump(movies, f)
+        with open("indices.pkl", "wb") as f:
+            pickle.dump(indices, f)
+    else:
+        with open("cosine_sim.pkl", "rb") as f:
+            cosine_sim = pickle.load(f)
+        with open("movies.pkl", "rb") as f:
+            movies = pickle.load(f)
+        with open("indices.pkl", "rb") as f:
+            indices = pickle.load(f)
     return cosine_sim, movies, indices
 
-cosine_sim, movies, indices = load_model()
-
 def get_recommendations(title, num=10):
+    cosine_sim, movies, indices = load_model()
     if title not in indices:
         return None
     idx = indices[title]
@@ -39,6 +61,8 @@ def get_recommendations(title, num=10):
 st.title("🎬 Movie Recommendation System")
 st.markdown("Select a movie and discover similar ones instantly!")
 st.divider()
+
+cosine_sim, movies, indices = load_model()
 
 col1, col2 = st.columns([3, 1])
 with col1:
@@ -61,15 +85,12 @@ if st.button("🎯 Get Recommendations", use_container_width=True):
         st.error("Movie not found!")
     else:
         st.subheader(f"Top {num_recs} movies similar to '{selected_movie}'")
-
         m1, m2, m3 = st.columns(3)
         m1.metric("Movies Analyzed", "4,800+")
         m2.metric("Top Match", f"{recommendations['Match %'].iloc[0]}%")
         m3.metric("Avg Rating",
                   f"{recommendations['Rating'].mean():.1f}/10")
-
         st.divider()
-
         cols = st.columns(2)
         for i, (_, row) in enumerate(recommendations.iterrows()):
             with cols[i % 2]:
@@ -83,7 +104,6 @@ if st.button("🎯 Get Recommendations", use_container_width=True):
                     f"⭐ Rating: {row['Rating']}/10 &nbsp;&nbsp;"
                     f"{match_color} Match: {row['Match %']}%"
                 )
-
         st.divider()
         st.subheader("📊 Full Results Table")
         st.dataframe(recommendations, use_container_width=True)
