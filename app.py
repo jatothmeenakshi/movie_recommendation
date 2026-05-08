@@ -16,11 +16,15 @@ def load_model():
     # Build model if pkl files don't exist
     if not os.path.exists("cosine_sim.pkl"):
         st.info("Building recommendation model... please wait 2 minutes!")
-        movies = pd.read_csv("https://raw.githubusercontent.com/karma-786/Week-4-and-5-Assignment/main/tmdb_5000_movies.csv")
-        movies = movies[["title", "overview", "genres",
-                         "keywords", "popularity", "vote_average"]]
-        movies["overview"] = movies["overview"].fillna("")
-        movies["combined"] = movies["overview"]
+        movies = pd.read_csv("https://raw.githubusercontent.com/LearnDataSci/articles/master/Python%20Pandas%20Tutorial%20A%20Complete%20Introduction%20for%20Beginners/IMDB-Movie-Data.csv")
+        movies = movies.rename(columns={
+             "Title": "title",
+             "Genre": "genres", 
+             "Rating": "vote_average",
+             "Votes": "popularity",
+             "Description": "overview"
+        })
+    
         movies = movies.reset_index()
         tfidf = TfidfVectorizer(stop_words="english")
         tfidf_matrix = tfidf.fit_transform(movies["combined"])
